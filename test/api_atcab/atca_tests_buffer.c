@@ -39,7 +39,7 @@ void init_ref_array(uint8_t * buf, size_t len)
 
     for (i = 0U; i < len; i++)
     {
-        buf[i] = i;
+        buf[i] = (uint8_t)i;
     }
 }
 
