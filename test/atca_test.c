@@ -410,6 +410,48 @@ void atca_test_assert_ta_sboot_preboot_enabled(UNITY_LINE_TYPE from_line)
         }
     }
 }
+
+//The Function checks the digest type used for preboot Secureboot in configuration zone , if it is not set, it skips the test
+void atca_test_assert_ta_sboot_preboot_digest_type_enabled(UNITY_LINE_TYPE from_line, uint8_t mode)
+{
+    if (atcab_is_ta_device(gCfg->devtype))
+    {
+        ATCA_STATUS status;
+        uint8_t check_config_sboot_preboot_digest_type_enable[8];
+        uint16_t config_size = sizeof(check_config_sboot_preboot_digest_type_enable);
+        cal_buffer check_config_sboot_preboot_digest_type_enable_buf = CAL_BUF_INIT(config_size, check_config_sboot_preboot_digest_type_enable);
+
+        // Bytes 32 of the config zone contains the Secure boot config bit
+        status = talib_read_partial_element(atcab_get_device(), TA_HANDLE_CONFIG_MEMORY, 32, &check_config_sboot_preboot_digest_type_enable_buf);
+        UNITY_TEST_ASSERT_EQUAL_INT(ATCA_SUCCESS, status, from_line, NULL);
+
+        if ((check_config_sboot_preboot_digest_type_enable[6] & TA_SECUREBOOT_CONFIG_PREBOOT_DIGEST_MASK) != mode)
+        {
+            TEST_IGNORE_MESSAGE("Ignoring the test, Digest type for Preboot Secureboot is not configured");
+        }
+    }
+}
+
+//The Function checks the digest type used for Secureboot in configuration zone , if it is not set, it skips the test
+void atca_test_assert_ta_sboot_digest_type_enabled(UNITY_LINE_TYPE from_line, uint8_t mode)
+{
+    if (atcab_is_ta_device(gCfg->devtype))
+    {
+        ATCA_STATUS status;
+        uint8_t check_config_sboot_digest_type_enable[8];
+        uint16_t config_size = sizeof(check_config_sboot_digest_type_enable);
+        cal_buffer check_config_sboot_digest_type_enable_buf = CAL_BUF_INIT(config_size, check_config_sboot_digest_type_enable);
+
+        // Bytes 32 of the config zone contains the Secure boot config bit
+        status = talib_read_partial_element(atcab_get_device(), TA_HANDLE_CONFIG_MEMORY, 32, &check_config_sboot_digest_type_enable_buf);
+        UNITY_TEST_ASSERT_EQUAL_INT(ATCA_SUCCESS, status, from_line, NULL);
+
+        if ((check_config_sboot_digest_type_enable[6] & TA_SECUREBOOT_CONFIG_DIGEST_MASK) != mode)
+        {
+            TEST_IGNORE_MESSAGE("Ignoring the test, Digest type for Secureboot is not configured");
+        }
+    }
+}
 #endif
 
 ATCA_STATUS atca_test_config_get_id(uint8_t test_type, uint16_t* handle)
@@ -418,43 +460,36 @@ ATCA_STATUS atca_test_config_get_id(uint8_t test_type, uint16_t* handle)
 
     if (test_type && handle)
     {
-        switch (gCfg->devtype)
+        if (atcab_is_ca_device(gCfg->devtype))
         {
-#if ATCA_CA_SUPPORT
-        case ATSHA204A:
-        /* fallthrough */
-        case ATECC108A:
-        /* fallthrough */
-        case ATECC508A:
-        /* fallthrough */
-        case ATECC608:
+    #if ATCA_CA_SUPPORT
             status = calib_config_get_slot_by_test(test_type, handle);
-            break;
-#endif
-#if defined(ATCA_TA010_SUPPORT) || defined(ATCA_ECC204_SUPPORT)
-        case TA010:
-        /* fallthrough */
-        case ECC204:
-            status = calib_config_get_ecc204_slot_by_test(test_type, handle);
-            break;
-#endif
-#if defined(ATCA_SHA104_SUPPORT) || defined(ATCA_SHA105_SUPPORT)
-        case SHA104:
-        /* fallthrough */
-        case SHA105:
-            status = calib_config_get_sha10x_slot_by_test(test_type, handle);
-            break;
-#endif
-#if ATCA_TA_SUPPORT
-        case TA100:
-        /* fallthrough */
-        case TA101:
-            status = talib_config_get_handle_by_test(test_type, handle);
-            break;
-#endif
-        default:
+    #endif
+        }
+        else if (atcab_is_ca2_device(gCfg->devtype))
+        {
+            if (ECC204 == gCfg->devtype || TA010 == gCfg->devtype)
+            {
+    #if defined(ATCA_TA010_SUPPORT) || defined(ATCA_ECC204_SUPPORT)
+                status = calib_config_get_ecc204_slot_by_test(test_type, handle);
+    #endif
+            }
+            else
+            {
+    #if defined(ATCA_SHA104_SUPPORT) || defined(ATCA_SHA105_SUPPORT)
+                status = calib_config_get_sha10x_slot_by_test(test_type, handle);
+    #endif
+            }
+        }
+        else if (atcab_is_ta_device(gCfg->devtype))
+        {
+    #if ATCA_TA_SUPPORT
+             status = talib_config_get_handle_by_test(test_type, handle);
+    #endif
+        }
+        else
+        {
             status = ATCA_UNIMPLEMENTED;
-            break;
         }
     }
 

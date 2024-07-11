@@ -2458,6 +2458,47 @@ ATCA_STATUS atcab_random(uint8_t* rand_out)
 
 // Read command functions
 
+#if ATCAB_READ_EN && defined(ATCA_USE_ATCAB_FUNCTIONS)
+/** \brief Executes Read command, which reads either 4 or 32 bytes of data from
+ *          a given slot, configuration zone, or the OTP zone.
+ *
+ *   When reading a slot or OTP, data zone must be locked and the slot
+ *   configuration must not be secret for a slot to be successfully read.
+ *
+ *  \param[in]  device  Device context
+ *  \param[in]  zone    Zone to be read from device. Options are
+ *                      ATCA_ZONE_CONFIG, ATCA_ZONE_OTP, or ATCA_ZONE_DATA.
+ *  \param[in]  slot    Slot number for data zone and ignored for other zones.
+ *  \param[in]  block   32 byte block index within the zone.
+ *  \param[in]  offset  4 byte work index within the block. Ignored for 32 byte
+ *                      reads.
+ *  \param[out] data    Read data is returned here.
+ *  \param[in]  len     Length of the data to be read. Must be either 4 or 32.
+ *
+ *  returns ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS atcab_read_zone_ext(ATCADevice device, uint8_t zone, uint16_t slot, uint8_t block, uint8_t offset, uint8_t* data, uint8_t len)
+{
+    ATCA_STATUS status = ATCA_UNIMPLEMENTED;
+    ATCADeviceType dev_type = atcab_get_device_type_ext(device);
+
+    if (atcab_is_ca_device(dev_type) || atcab_is_ca2_device(dev_type))
+    {
+#if ATCA_CA_SUPPORT
+        status = calib_read_zone_ext(device, zone, slot, block, offset, data, len);
+#endif
+    }
+    else if (atcab_is_ta_device(dev_type))
+    {
+        status = ATCA_UNIMPLEMENTED;
+    }
+    else
+    {
+        status = ATCA_NOT_INITIALIZED;
+    }
+    return status;
+}
+
 /** \brief Executes Read command, which reads either 4 or 32 bytes of data from
  *          a given slot, configuration zone, or the OTP zone.
  *
@@ -2475,27 +2516,9 @@ ATCA_STATUS atcab_random(uint8_t* rand_out)
  *
  *  returns ATCA_SUCCESS on success, otherwise an error code.
  */
-#if ATCAB_READ_EN && defined(ATCA_USE_ATCAB_FUNCTIONS)
 ATCA_STATUS atcab_read_zone(uint8_t zone, uint16_t slot, uint8_t block, uint8_t offset, uint8_t* data, uint8_t len)
 {
-    ATCA_STATUS status = ATCA_UNIMPLEMENTED;
-    ATCADeviceType dev_type = atcab_get_device_type();
-
-    if (atcab_is_ca_device(dev_type) || atcab_is_ca2_device(dev_type))
-    {
-#if ATCA_CA_SUPPORT
-        status = calib_read_zone_ext(g_atcab_device_ptr, zone, slot, block, offset, data, len);
-#endif
-    }
-    else if (atcab_is_ta_device(dev_type))
-    {
-        status = ATCA_UNIMPLEMENTED;
-    }
-    else
-    {
-        status = ATCA_NOT_INITIALIZED;
-    }
-    return status;
+    return atcab_read_zone_ext(atcab_get_device(), zone, slot, block, offset, data, len);
 }
 #endif /* ATCAB_READ_EN */
 
@@ -3548,7 +3571,7 @@ ATCA_STATUS atcab_sha_hmac_init(atca_hmac_sha256_ctx_t* ctx, uint16_t key_slot)
     ATCA_STATUS status = ATCA_UNIMPLEMENTED;
     ATCADeviceType dev_type = atcab_get_device_type();
 
-    if (atcab_is_ca_device(dev_type))
+    if (atcab_is_ca_device(dev_type) || atcab_is_ca2_device(dev_type))
     {
 #if CALIB_SHA_HMAC_EN
         status = calib_sha_hmac_init(g_atcab_device_ptr, ctx, key_slot);
@@ -3579,7 +3602,7 @@ ATCA_STATUS atcab_sha_hmac_update(atca_hmac_sha256_ctx_t* ctx, const uint8_t* da
     ATCA_STATUS status = ATCA_UNIMPLEMENTED;
     ATCADeviceType dev_type = atcab_get_device_type();
 
-    if (atcab_is_ca_device(dev_type))
+    if (atcab_is_ca_device(dev_type) || atcab_is_ca2_device(dev_type))
     {
 #if CALIB_SHA_HMAC_EN
         status = calib_sha_hmac_update(g_atcab_device_ptr, ctx, data, data_size);
@@ -3613,7 +3636,7 @@ ATCA_STATUS atcab_sha_hmac_finish(atca_hmac_sha256_ctx_t* ctx, uint8_t* digest, 
     ATCA_STATUS status = ATCA_UNIMPLEMENTED;
     ATCADeviceType dev_type = atcab_get_device_type();
 
-    if (atcab_is_ca_device(dev_type))
+    if (atcab_is_ca_device(dev_type) || atcab_is_ca2_device(dev_type))
     {
 #if CALIB_SHA_HMAC_EN
         status = calib_sha_hmac_finish(g_atcab_device_ptr, ctx, digest, target);
@@ -3650,7 +3673,7 @@ ATCA_STATUS atcab_sha_hmac_ext(ATCADevice device, const uint8_t* data, size_t da
     ATCA_STATUS status = ATCA_UNIMPLEMENTED;
     ATCADeviceType dev_type = atcab_get_device_type_ext(device);
 
-    if (atcab_is_ca_device(dev_type))
+    if (atcab_is_ca_device(dev_type) || atcab_is_ca2_device(dev_type))
     {
 #if CALIB_SHA_HMAC_EN
         status = calib_sha_hmac(device, data, data_size, key_slot, digest, target);
@@ -4016,7 +4039,7 @@ ATCA_STATUS atcab_verify_extern_mac(const uint8_t* message, const uint8_t* signa
 
     if (atcab_is_ca_device(dev_type))
     {
-#ifdef ATCA_ECC_SUPPORT
+#ifdef ATCA_ATECC608_SUPPORT
         status = calib_verify_extern_mac(g_atcab_device_ptr, message, signature, public_key, num_in, io_key, is_verified);
 #endif
     }
@@ -4163,7 +4186,7 @@ ATCA_STATUS atcab_verify_stored_mac(const uint8_t* message, const uint8_t* signa
 
     if (atcab_is_ca_device(dev_type))
     {
-#ifdef ATCA_ECC_SUPPORT
+#ifdef ATCA_ATECC608_SUPPORT
         status = calib_verify_stored_mac(g_atcab_device_ptr, message, signature, key_id, num_in, io_key, is_verified);
 #endif
     }

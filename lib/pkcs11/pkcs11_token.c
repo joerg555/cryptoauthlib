@@ -86,10 +86,10 @@ static const char * pkcs11_token_device(ATCADeviceType dev_type, uint8_t info[4]
 
     if (atcab_is_ca_device(dev_type))
     {
-        switch (info[2])
+        switch (info[DEVICE_PART_LOCATION])
         {
         case 0x00:
-            if (0x02u == info[1])
+            if (0x02u == info[DEVICE_IDENTIFIER_LOCATION])
             {
                 rv = "ATSHA204A";
             }
@@ -98,7 +98,7 @@ static const char * pkcs11_token_device(ATCADeviceType dev_type, uint8_t info[4]
             rv = "ATECC508A";
             break;
         case 0x60:
-            if (0x02u < info[3])
+            if (0x02u < info[DEVICE_REVISION_LOCATION])
             {
                 rv = "ATECC608B";
             }
@@ -115,7 +115,14 @@ static const char * pkcs11_token_device(ATCADeviceType dev_type, uint8_t info[4]
 
     if (atcab_is_ta_device(dev_type))
     {
-        rv = "TA100";
+        if(0x01u == info[DEVICE_PRODUCT_ID_LOCATION])
+        {
+            rv = "TA101";
+        }
+        else
+        {
+            rv = "TA100";
+        }
     }
 
     return rv;
@@ -687,7 +694,7 @@ CK_RV pkcs11_token_convert_pin_to_key(
 
 #ifndef PKCS11_PIN_KDF_ALWAYS
     bool is_ca_device = atcab_is_ca_device(atcab_get_device_type_ext(slot_ctx->device_ctx));
-    uint16_t key_len = (uint16_t)(is_ca_device ? 32 : 16);
+    uint16_t key_len = (uint16_t)(is_ca_device ? ATCA_SHA256_DIGEST_SIZE : (ATCA_SHA256_DIGEST_SIZE/2u));
     if ((uint16_t)(2u * key_len) == ulPinLen)
     {
         size_t out_len = ulKeyLen;
@@ -728,10 +735,10 @@ CK_RV pkcs11_token_set_pin(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pOldPin,
     pkcs11_session_ctx_ptr pSession;
     pkcs11_lib_ctx_ptr pLibCtx;
     uint16_t pin_slot;
-    uint8_t buf[32] = { 0 };
+    uint8_t buf[ATCA_SHA256_DIGEST_SIZE] = { 0 };
     CK_RV rv;
     bool is_ca_device = false;
-    uint16_t key_len = 0;
+    CK_ULONG key_len = 0;
 
     ((void)pOldPin);
     ((void)ulOldLen);
@@ -754,7 +761,10 @@ CK_RV pkcs11_token_set_pin(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pOldPin,
     }
 
     is_ca_device = atcab_is_ca_device(atcab_get_device_type_ext(pSession->slot->device_ctx));
-    key_len = (uint16_t)(is_ca_device ? 32 : 16);
+
+    //For TA100/TA101, with AES 128 GCM generated key, 16 byte data of key is written to auth handle 
+    //For ECC, 32 bytes write possible
+    key_len = (is_ca_device ? ATCA_SHA256_DIGEST_SIZE : (ATCA_SHA256_DIGEST_SIZE/2u));
 
     if (CKR_OK == (rv = pkcs11_lock_context(pLibCtx)))
     {
@@ -790,7 +800,7 @@ CK_RV pkcs11_token_set_pin(CK_SESSION_HANDLE hSession, CK_UTF8CHAR_PTR pOldPin,
         {
             if (CKR_OK == (rv = pkcs11_lock_device(pLibCtx)))
             {
-                rv = pkcs11_util_convert_rv(atcab_write_zone_ext(pSession->slot->device_ctx, ATCA_ZONE_DATA, pin_slot, 0, 0, buf, (uint8_t)sizeof(buf)));
+                rv = pkcs11_util_convert_rv(atcab_write_zone_ext(pSession->slot->device_ctx, ATCA_ZONE_DATA, pin_slot, 0, 0, buf, (uint8_t)key_len));
                 (void)pkcs11_unlock_device(pLibCtx);
             }
         }

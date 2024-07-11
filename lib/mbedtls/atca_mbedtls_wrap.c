@@ -72,7 +72,7 @@
 #include "atcacert/atcacert_def.h"
 #endif
 
-#if !defined(ATCA_NO_HEAP)
+#ifdef ATCA_HEAP
 struct atcac_sha1_ctx* atcac_sha1_ctx_new(void)
 {
     return (struct atcac_sha1_ctx*)hal_malloc(sizeof(atcac_sha1_ctx_t));
@@ -773,13 +773,12 @@ ATCA_STATUS atcac_pk_free(
     struct atcac_pk_ctx* ctx /**< [in] pointer to a pk context */
     )
 {
-    ATCA_STATUS status = ATCA_BAD_PARAM;
+    ATCA_STATUS status = ATCA_SUCCESS;
 
     if (NULL != ctx)
     {
         void* tmp_ptr = ctx;
-        mbedtls_pk_init((mbedtls_pk_context*)tmp_ptr);
-        status = ATCA_SUCCESS;
+        mbedtls_pk_free((mbedtls_pk_context*)tmp_ptr);
     }
     return status;
 }
@@ -1283,7 +1282,7 @@ int atca_mbedtls_pk_init(mbedtls_pk_context * pkey, const uint16_t slotid)
 }
 
 #if (ATCA_CA_SUPPORT && ATCACERT_COMPCERT_EN)
-#if !defined(ATCA_NO_HEAP)
+#if defined(ATCA_HEAP)
 /** \brief Rebuild a certificate from an atcacert_def_t structure, and then add
  * it to an mbedtls cert chain.
  * \param[in,out] cert mbedtls cert chain. Must have already been initialized
@@ -1346,7 +1345,7 @@ ATCA_STATUS atcac_parse_der(struct atcac_x509_ctx** cert, cal_buffer* der)
 
     if (NULL != cert && NULL != der)
     {
-#if !defined(ATCA_NO_HEAP)
+#if defined(ATCA_HEAP)
         mbedtls_x509_crt* xcert = atcac_mbedtls_new();
 
         if (xcert == NULL)
@@ -1367,7 +1366,7 @@ ATCA_STATUS atcac_parse_der(struct atcac_x509_ctx** cert, cal_buffer* der)
         /* coverity[misra_c_2012_rule_11_3_violation:FALSE] The mbetls x509 struct pointer is made to point the atcac_x509_ctx void ptr*/
         /*The memory allocated will be traversed using the void ptr in atcac_x509_ctx and is the only member*/
         /* Our library uses structure of type atcac_x509_ctx to be mapped to third party specific certificate structre and this cannot be changed*/
-        *cert = xcert;
+        *cert = (struct atcac_x509_ctx*)xcert;
         status = ATCA_SUCCESS;
 #endif
     }
@@ -1454,7 +1453,7 @@ ATCA_STATUS atcac_get_subj_key_id(const struct atcac_x509_ctx* cert, cal_buffer*
 
     if (NULL != cert && NULL != subj_public_key_id)
     {
-#if !defined(ATCA_NO_HEAP)
+#if defined(ATCA_HEAP)
         /* coverity[misra_c_2012_rule_21_3_violation:FALSE] Using mbedtls memory allocation api for initializing asn1 sequence object */
         // By design mbedtls prefers calloc as it not only allocates but also initializes the data
         mbedtls_asn1_sequence *extns = mbedtls_calloc(1, sizeof(mbedtls_asn1_sequence));
@@ -1556,6 +1555,8 @@ ATCA_STATUS atcac_get_issue_date(const struct atcac_x509_ctx* cert, cal_buffer* 
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
 
+    UNUSED_VAR(fmt);
+
     if (NULL != cert && NULL != not_before)
     {
         /* coverity[cert_exp40_c_violation:FALSE] mbedtls ssl api requires non const qualifier in lower apis*/
@@ -1574,6 +1575,8 @@ ATCA_STATUS atcac_get_issue_date(const struct atcac_x509_ctx* cert, cal_buffer* 
 ATCA_STATUS atcac_get_expire_date(const struct atcac_x509_ctx* cert, cal_buffer* not_after, uint8_t* fmt)
 {
     ATCA_STATUS status = ATCA_BAD_PARAM;
+
+    UNUSED_VAR(fmt);
 
     if (NULL != cert && NULL != not_after)
     {
@@ -1636,7 +1639,7 @@ ATCA_STATUS atcac_get_auth_key_id(const struct atcac_x509_ctx* cert, cal_buffer*
 
     if (NULL != cert && NULL != auth_key_id)
     {
-#if !defined(ATCA_NO_HEAP)
+#if defined(ATCA_HEAP)
         /* coverity[misra_c_2012_rule_21_3_violation:FALSE] Using mbedtls memory allocation api for initializing asn1 sequence object */
         // By design mbedtls prefers calloc as it not only allocates but also initializes the data
         mbedtls_asn1_sequence *extns = mbedtls_calloc(1, sizeof(mbedtls_asn1_sequence));

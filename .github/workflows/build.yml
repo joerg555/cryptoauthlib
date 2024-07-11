@@ -37,7 +37,7 @@ jobs:
           cp -r ../app/tng app
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.11.1
+        uses: pypa/cibuildwheel@v2.17.0
         with:
           package-dir: python 
         env:
