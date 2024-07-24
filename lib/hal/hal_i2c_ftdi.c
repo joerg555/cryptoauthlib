@@ -151,10 +151,13 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t addr, uint8_t* txdata, int txl
     atca_i2c_ftdi_host_t* hal = (atca_i2c_ftdi_host_t*)atgetifacehaldat(iface);
     FT_STATUS status;
     DWORD xfer = 0;
+    if (txlength <= 0)
+        return ATCA_SUCCESS;
+
 
     if (hal == NULL || hal->ftHandle == NULL)
         return ATCA_NOT_INITIALIZED;
-    status = I2C_DeviceWrite(hal->ftHandle, iface->mIfaceCFG->atcai2c.address << 1, txlength, txdata, &xfer,
+    status = I2C_DeviceWrite(hal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, txlength, txdata, &xfer,
         I2C_TRANSFER_OPTIONS_START_BIT |
         I2C_TRANSFER_OPTIONS_STOP_BIT |
         I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
@@ -183,7 +186,7 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t addr, uint8_t* rxdata, uint
     DWORD xfer = 0;
 
     /* Repeated Start condition generated. */
-    status = I2C_DeviceRead(phal->ftHandle, iface->mIfaceCFG->atcai2c.address << 1, *rxlength, rxdata, &xfer,
+    status = I2C_DeviceRead(phal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, *rxlength, rxdata, &xfer,
         I2C_TRANSFER_OPTIONS_START_BIT |
         I2C_TRANSFER_OPTIONS_STOP_BIT |
         I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
@@ -215,38 +218,38 @@ ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t
     ATCA_STATUS status = ATCA_UNIMPLEMENTED;
     switch (option)
     {
-    //case ATCA_HAL_CONTROL_WAKE:
-    //{
-    //    FT_STATUS status;
-    //    DWORD xfer = 0;
-    //    unsigned char rxchar = 0;
-    //    unsigned char rxbuf[4];
-    //    /* Repeated Start condition generated. */
-    //    status = I2C_DeviceWrite(phal->ftHandle, 0, 1, &rxchar, &xfer,
-    //        I2C_TRANSFER_OPTIONS_START_BIT |
-    //        I2C_TRANSFER_OPTIONS_STOP_BIT |
-    //        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-    //    hal_delay_us(1500);
-    //    memset(rxbuf, 0, sizeof(rxbuf));
-    //    status = I2C_DeviceRead(phal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, sizeof(rxbuf), rxbuf, &xfer,
-    //        I2C_TRANSFER_OPTIONS_START_BIT |
-    //        I2C_TRANSFER_OPTIONS_STOP_BIT |
-    //        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-    //    if (status == FT_OK)
-    //        return ATCA_SUCCESS;
-    //    break;
-    //}
-    //case ATCA_HAL_CONTROL_IDLE:
-    //    status = iface->mIfaceCFG->atcacustom.halidle(iface);
-    //    break;
-    //case ATCA_HAL_CONTROL_SLEEP:
-    //    status = iface->mIfaceCFG->atcacustom.halsleep(iface);
-    //    break;
-    //case ATCA_HAL_CONTROL_SELECT:
-    //    /* fallthrough */
-    //case ATCA_HAL_CONTROL_DESELECT:
-    //    status = ATCA_SUCCESS;
-    //    break;
+        //case ATCA_HAL_CONTROL_WAKE:
+        //{
+        //    FT_STATUS status;
+        //    DWORD xfer = 0;
+        //    unsigned char rxchar = 0;
+        //    unsigned char rxbuf[4];
+        //    /* Repeated Start condition generated. */
+        //    status = I2C_DeviceWrite(phal->ftHandle, 0, 1, &rxchar, &xfer,
+        //        I2C_TRANSFER_OPTIONS_START_BIT |
+        //        I2C_TRANSFER_OPTIONS_STOP_BIT |
+        //        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
+        //    hal_delay_us(1500);
+        //    memset(rxbuf, 0, sizeof(rxbuf));
+        //    status = I2C_DeviceRead(phal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, sizeof(rxbuf), rxbuf, &xfer,
+        //        I2C_TRANSFER_OPTIONS_START_BIT |
+        //        I2C_TRANSFER_OPTIONS_STOP_BIT |
+        //        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
+        //    if (status == FT_OK)
+        //        return ATCA_SUCCESS;
+        //    break;
+        //}
+        //case ATCA_HAL_CONTROL_IDLE:
+        //    status = iface->mIfaceCFG->atcacustom.halidle(iface);
+        //    break;
+        //case ATCA_HAL_CONTROL_SLEEP:
+        //    status = iface->mIfaceCFG->atcacustom.halsleep(iface);
+        //    break;
+        //case ATCA_HAL_CONTROL_SELECT:
+        //    /* fallthrough */
+        //case ATCA_HAL_CONTROL_DESELECT:
+        //    status = ATCA_SUCCESS;
+        //    break;
     default:
         status = ATCA_UNIMPLEMENTED;
         break;
