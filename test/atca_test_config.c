@@ -61,20 +61,34 @@ static char opt_device_name[20];
 /** gCfg must point to one of the cfg_ structures for any unit test to work.  this allows
    the command console to switch device types at runtime. */
 ATCAIfaceCfg g_iface_config = {
-#ifdef ATCA_HAL_KIT_HID
+#if defined ATCA_HAL_KIT_HID
     .iface_type            = ATCA_HID_IFACE,
+#elif defined ATCA_HAL_I2C
+    .iface_type = ATCA_I2C_IFACE,
 #else
     .iface_type            = ATCA_UNKNOWN_IFACE,
 #endif
     .devtype               = ATCA_DEV_UNKNOWN,
     {
-#ifdef ATCA_HAL_KIT_HID
+#if defined ATCA_HAL_KIT_HID
         .atcahid           = {
             .dev_identity  = 0,
             .idx           = 0,
             .vid           = 0x03EB,
             .pid           = 0x2312,
             .packetsize    = 64,
+        },
+#elif defined ATCA_HAL_I2C
+#ifndef ATCA_HAL_I2C_DEF_BUS
+#define ATCA_HAL_I2C_DEF_BUS 0
+#endif
+#ifndef ATCA_HAL_I2C_DEF_BAUD
+#define ATCA_HAL_I2C_DEF_BAUD 100000
+#endif
+        .atcai2c = {
+            .address = 0xC0,
+            .bus = ATCA_HAL_I2C_DEF_BUS,
+            .baud = ATCA_HAL_I2C_DEF_BAUD,
         },
 #else
         .atcai2c           = {
