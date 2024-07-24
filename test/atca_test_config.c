@@ -79,10 +79,16 @@ ATCAIfaceCfg g_iface_config = {
             .packetsize    = 64,
         },
 #elif defined ATCA_HAL_I2C
+#ifndef ATCA_HAL_I2C_DEF_BUS
+#define ATCA_HAL_I2C_DEF_BUS 0
+#endif
+#ifndef ATCA_HAL_I2C_DEF_BAUD
+#define ATCA_HAL_I2C_DEF_BAUD 100000
+#endif
         .atcai2c = {
             .address = 0xC0,
-            .bus = 0,
-            .baud = 40000,
+            .bus = ATCA_HAL_I2C_DEF_BUS,
+            .baud = ATCA_HAL_I2C_DEF_BAUD,
         },
 #else
         .atcai2c           = {

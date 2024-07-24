@@ -74,3 +74,5 @@ dist-tools/cryptoauthlib*
 third_party/mbedtls/*
 third_party/wolfssl/*
 
+/outjsm
+/outlinux
