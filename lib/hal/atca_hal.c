@@ -35,6 +35,11 @@
 #include "cryptoauthlib.h"
 #include "atca_hal.h"
 
+// i dont no why this
+#ifndef ATCA_NO_HEAP
+#define ATCA_HEAP
+#endif 
+
 #ifndef ATCA_MAX_HAL_CACHE
 #define ATCA_MAX_HAL_CACHE
 #endif
