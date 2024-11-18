@@ -104,9 +104,7 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
             ret = ATCA_ALLOC_FAILURE;
         }
     }
-
     return ret;
-
 }
 
 /** \brief HAL implementation of I2C post init

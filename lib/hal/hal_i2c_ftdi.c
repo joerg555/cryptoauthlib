@@ -112,33 +112,6 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
     return ATCA_SUCCESS;
 }
 
-/** \brief manages reference count on given bus and releases resource if no more refences exist
- * \param[in] hal_data - opaque pointer to hal data structure - known only to the HAL implementation
- * \return ATCA_SUCCESS on success, otherwise an error code.
- */
-ATCA_STATUS hal_i2c_release(void* hal_data)
-{
-    atca_i2c_ftdi_host_t* hal = (atca_i2c_ftdi_host_t*)hal_data;
-
-    if (hal != NULL)
-    {
-        // if the use count for this bus has gone to 0 references, 
-        // disable it.  protect against an unbracketed release
-        if (hal->ref_ct > 0)
-        {
-            hal->ref_ct--;
-        }
-        if (hal->ref_ct == 0)
-        {
-            if (hal->ftHandle != NULL)
-                I2C_CloseChannel(hal->ftHandle);
-            Cleanup_libMPSSE();
-            free(hal);
-        }
-    }
-    return ATCA_SUCCESS;
-}
-
 /** \brief HAL implementation of I2C send
  * \param[in] iface         instance
  * \param[in] word_address  device transaction type
@@ -208,54 +181,40 @@ ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t
     (void)option;
     (void)param;
     (void)paramlen;
-    //atca_i2c_ftdi_host_t* phal;
-    //ATCA_STATUS status = ATCA_BAD_PARAM;
 
-    //if (iface == NULL || iface->mIfaceCFG == NULL
-    //    || (phal = (atca_i2c_ftdi_host_t*)atgetifacehaldat(iface)) == NULL
-    //    || phal->ftHandle == NULL)
-    //    return status;
-    ATCA_STATUS status = ATCA_UNIMPLEMENTED;
-    switch (option)
+    if ((NULL != iface) && (NULL != iface->mIfaceCFG))
     {
-        //case ATCA_HAL_CONTROL_WAKE:
-        //{
-        //    FT_STATUS status;
-        //    DWORD xfer = 0;
-        //    unsigned char rxchar = 0;
-        //    unsigned char rxbuf[4];
-        //    /* Repeated Start condition generated. */
-        //    status = I2C_DeviceWrite(phal->ftHandle, 0, 1, &rxchar, &xfer,
-        //        I2C_TRANSFER_OPTIONS_START_BIT |
-        //        I2C_TRANSFER_OPTIONS_STOP_BIT |
-        //        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-        //    hal_delay_us(1500);
-        //    memset(rxbuf, 0, sizeof(rxbuf));
-        //    status = I2C_DeviceRead(phal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, sizeof(rxbuf), rxbuf, &xfer,
-        //        I2C_TRANSFER_OPTIONS_START_BIT |
-        //        I2C_TRANSFER_OPTIONS_STOP_BIT |
-        //        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
-        //    if (status == FT_OK)
-        //        return ATCA_SUCCESS;
-        //    break;
-        //}
-        //case ATCA_HAL_CONTROL_IDLE:
-        //    status = iface->mIfaceCFG->atcacustom.halidle(iface);
-        //    break;
-        //case ATCA_HAL_CONTROL_SLEEP:
-        //    status = iface->mIfaceCFG->atcacustom.halsleep(iface);
-        //    break;
-        //case ATCA_HAL_CONTROL_SELECT:
-        //    /* fallthrough */
-        //case ATCA_HAL_CONTROL_DESELECT:
-        //    status = ATCA_SUCCESS;
-        //    break;
-    default:
-        status = ATCA_UNIMPLEMENTED;
-        break;
-    }
     /* This HAL does not support any of the control functions */
-    return status;
+        return ATCA_UNIMPLEMENTED;
+    }
+    return ATCA_BAD_PARAM;
+}
+
+/** \brief manages reference count on given bus and releases resource if no more refences exist
+ * \param[in] hal_data - opaque pointer to hal data structure - known only to the HAL implementation
+ * \return ATCA_SUCCESS on success, otherwise an error code.
+ */
+ATCA_STATUS hal_i2c_release(void* hal_data)
+{
+    atca_i2c_ftdi_host_t* hal = (atca_i2c_ftdi_host_t*)hal_data;
+
+    if (hal != NULL)
+    {
+        // if the use count for this bus has gone to 0 references, 
+        // disable it.  protect against an unbracketed release
+        if (hal->ref_ct > 0)
+        {
+            hal->ref_ct--;
+        }
+        if (hal->ref_ct == 0)
+        {
+            if (hal->ftHandle != NULL)
+                I2C_CloseChannel(hal->ftHandle);
+            Cleanup_libMPSSE();
+            free(hal);
+        }
+    }
+    return ATCA_SUCCESS;
 }
 
 
