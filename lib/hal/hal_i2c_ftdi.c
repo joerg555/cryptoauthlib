@@ -39,6 +39,7 @@
 
 #define FTDIMPSSE_STATIC
 #include "../../ftdi-mpsse/ftd2xx.h"
+#include "../../ftdi-mpsse/ftdi_common.h"
 #include "../../ftdi-mpsse/libmpsse_i2c.h"
 
  /** \defgroup hal_ Hardware abstraction layer (hal_)
@@ -70,6 +71,7 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
     atca_i2c_ftdi_host_t* hal;
     FT_DEVICE_LIST_INFO_NODE devList;
     FT_STATUS status;
+    ChannelConfig channelConf;
 
     if (iface == NULL || cfg == NULL)
         return ATCA_BAD_PARAM;
@@ -90,10 +92,18 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
     hal->ref_ct = 1;                                 // buses are shared, this is the first instance
     hal->channel = (int)ATCA_IFACECFG_VALUE(cfg, atcai2c.bus); // 0-based logical bus number
     hal->ftHandle = NULL;
+    //channelConf.ClockRate = I2C_CLOCK_FAST_MODE;/*i.e. 400000 KHz*/
+    channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE; /*i.e. 100000 KHz*/
+    //channelConf.ClockRate = 20000; /*for test only*/
+    channelConf.LatencyTimer = 255;
+    //channelConf.Options = I2C_DISABLE_3PHASE_CLOCKING;
+    channelConf.Options = I2C_ENABLE_DRIVE_ONLY_ZERO;
+    //channelConf.Options = I2C_DISABLE_3PHASE_CLOCKING | I2C_ENABLE_DRIVE_ONLY_ZERO;
 
     Init_libMPSSE();
     status = I2C_GetChannelInfo(hal->channel, &devList);
     status = I2C_OpenChannel(hal->channel, &hal->ftHandle);
+    status = I2C_InitChannel(hal->ftHandle, &channelConf);
     if (status != FT_OK)
     {
         hal->ftHandle = NULL;
