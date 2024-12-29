@@ -119,21 +119,30 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
  * \param[in] txlength      number of bytes to send
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
-ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t addr, uint8_t* txdata, int txlength)
+ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata, int txlength)
 {
     atca_i2c_ftdi_host_t* hal = (atca_i2c_ftdi_host_t*)atgetifacehaldat(iface);
     FT_STATUS status;
     DWORD xfer = 0;
-    if (txlength <= 0)
-        return ATCA_SUCCESS;
-
-
+    uint8_t temp_buf[64];
+    uint8_t device_address = ATCA_IFACECFG_I2C_ADDRESS(iface->mIfaceCFG);
+    uint32_t options;
     if (hal == NULL || hal->ftHandle == NULL)
         return ATCA_NOT_INITIALIZED;
-    status = I2C_DeviceWrite(hal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, txlength, txdata, &xfer,
-        I2C_TRANSFER_OPTIONS_START_BIT |
-        I2C_TRANSFER_OPTIONS_STOP_BIT |
-        I2C_TRANSFER_OPTIONS_BREAK_ON_NACK);
+    if (txlength >= (sizeof(temp_buf) - 1))
+        return ATCA_BAD_PARAM;
+    if (device_address == 0)
+        return ATCA_SUCCESS;
+    temp_buf[0] = word_address;
+    if (txlength > 1 && txdata)
+        memcpy(temp_buf + 1, txdata, txlength);
+    txlength++;
+
+    if (device_address != 0)
+        options = I2C_TRANSFER_OPTIONS_START_BIT | I2C_TRANSFER_OPTIONS_STOP_BIT | I2C_TRANSFER_OPTIONS_BREAK_ON_NACK;
+    else
+        options = I2C_TRANSFER_OPTIONS_START_BIT | I2C_TRANSFER_OPTIONS_STOP_BIT;
+    status = I2C_DeviceWrite(hal->ftHandle, device_address >> 1, txlength, temp_buf, &xfer, options);
 
     if (status != FT_OK)
         return ATCA_COMM_FAIL;
@@ -157,12 +166,15 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t addr, uint8_t* rxdata, uint
 
     FT_STATUS status;
     DWORD xfer = 0;
+    uint8_t device_address = ATCA_IFACECFG_I2C_ADDRESS(iface->mIfaceCFG);
 
     /* Repeated Start condition generated. */
-    status = I2C_DeviceRead(phal->ftHandle, iface->mIfaceCFG->atcai2c.address >> 1, *rxlength, rxdata, &xfer,
+    status = I2C_DeviceRead(phal->ftHandle, device_address >> 1, *rxlength, rxdata, &xfer,
         I2C_TRANSFER_OPTIONS_START_BIT |
-        I2C_TRANSFER_OPTIONS_STOP_BIT |
-        I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE);
+        I2C_TRANSFER_OPTIONS_STOP_BIT
+        //| I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES
+        //| I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE
+    );
     *rxlength = (uint16_t)xfer;
     if (status == FT_OK)
         return ATCA_SUCCESS;

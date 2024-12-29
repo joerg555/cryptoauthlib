@@ -38,6 +38,17 @@
 #include "atca_hal.h"
 #include "SLABCP2112.h"
 
+//
+//#define DEBUG_BYTES
+#ifdef DEBUG_BYTES
+static DWORD g_tStart;
+DWORD GetTick()
+{
+    if (g_tStart == 0)
+        g_tStart = GetTickCount();
+    return GetTickCount() - g_tStart;
+}
+#endif
  /** \defgroup hal_ Hardware abstraction layer (hal_)
   *
   * \brief
@@ -135,21 +146,15 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
     HID_SMBUS_STATUS status;
     BOOL opened;
     uint8_t temp_buf[64];
-    uint8_t device_address;
+    uint8_t device_address = ATCA_IFACECFG_I2C_ADDRESS(iface->mIfaceCFG);
 
     if (phal == NULL || phal->m_hidSmbus == NULL)
         return ATCA_NOT_INITIALIZED;
     if (txlength >= (sizeof(temp_buf) - 1))
-    {
         return ATCA_BAD_PARAM;
-    }
 
-
-#ifdef ATCA_ENABLE_DEPRECATED
-    device_address = ATCA_IFACECFG_VALUE(iface->mIfaceCFG, atcai2c.slave_address);
-#else
-    device_address = ATCA_IFACECFG_VALUE(iface->mIfaceCFG, atcai2c.address);
-#endif
+    if (device_address == 0)
+        return ATCA_SUCCESS;
     temp_buf[0] = word_address;
     if (txlength > 1 && txdata)
         memcpy(temp_buf + 1, txdata, txlength);
@@ -161,10 +166,12 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
     status = HidSmbus_WriteRequest(phal->m_hidSmbus, device_address, temp_buf, txlength);
     if (status != 0)
         return ATCA_COMM_FAIL;
-    //printf("i2c_sen addr %02x, nlen %d :", device_address >> 1, txlength);
-    //for (int n = 0; n < txlength; n++)
-    //    printf("%02x ", temp_buf[n]);
-    //printf("\n");
+#ifdef DEBUG_BYTES
+    printf("i2c_sen %4ld addr %02x, nlen %d :", GetTick(), device_address >> 1, txlength);
+    for (int n = 0; n < txlength; n++)
+        printf("%02x ", temp_buf[n]);
+    printf("\n");
+#endif
     return ATCA_SUCCESS;
 }
 
@@ -209,10 +216,12 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t device_address, uint8_t* rx
             {
                 *rxlength = rxcnt;
                 phal->m_readstatus0 = HID_SMBUS_S0_IDLE;
-                //printf("i2c_rec addr %02x, nlen %d/%d :", device_address >> 1, *rxlength, rxcnt);
-                //for (int n = 0; n < *rxlength; n++)
-                //    printf("%02x ", rxdata[n]);
-                //printf("\n");
+#ifdef DEBUG_BYTES
+                printf("i2c_rec %4ld addr %02x, nlen %d/%d :", GetTick(), device_address >> 1, *rxlength, rxcnt);
+                for (int n = 0; n < *rxlength; n++)
+                    printf("%02x ", rxdata[n]);
+                printf("\n");
+#endif
                 return ATCA_SUCCESS;
             }
         }

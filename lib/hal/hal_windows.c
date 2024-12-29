@@ -48,7 +48,7 @@ void hal_delay_us(uint32_t delay)
     // todo: use a timer with us accuracy
     /* coverity[cert_flp34_c_violation] Loss of precision is inconsequential for this calculation */
     /* coverity[cert_flp36_c_violation] Loss of precision is inconsequential for this calculation */
-    uint32_t ms = (uint32_t)round(((float)delay / 1.0e3) + 0.5);     // Miliseconds
+    uint32_t ms = (delay + 500) / 1000;     // Miliseconds round
 
     // use Windows supplied delay
     Sleep(ms);
