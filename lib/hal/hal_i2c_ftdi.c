@@ -25,6 +25,11 @@
  * THIS SOFTWARE.
  */
 
+#define FTDIMPSSE_STATIC
+#include "../../ftdi-mpsse/ftdi_infra.h"
+#include "../../ftdi-mpsse/ftdi_common.h"
+#include "../../ftdi-mpsse/libmpsse_i2c.h"
+
 #include <cryptoauthlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,10 +42,6 @@
 
 #include "atca_hal.h"
 
-#define FTDIMPSSE_STATIC
-#include "../../ftdi-mpsse/ftd2xx.h"
-#include "../../ftdi-mpsse/ftdi_common.h"
-#include "../../ftdi-mpsse/libmpsse_i2c.h"
 
  /** \defgroup hal_ Hardware abstraction layer (hal_)
   *
@@ -55,7 +56,6 @@ typedef struct atca_i2c_host_s
     unsigned channel;
     int  ref_ct;
 } atca_i2c_ftdi_host_t;
-
 
 /** \brief HAL implementation of I2C init
  *
@@ -75,7 +75,6 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
 
     if (iface == NULL || cfg == NULL)
         return ATCA_BAD_PARAM;
-
     if (iface->hal_data != NULL)
     {
         hal = (atca_i2c_ftdi_host_t*)iface->hal_data;
@@ -93,7 +92,8 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
     hal->channel = (int)ATCA_IFACECFG_VALUE(cfg, atcai2c.bus); // 0-based logical bus number
     hal->ftHandle = NULL;
     //channelConf.ClockRate = I2C_CLOCK_FAST_MODE;/*i.e. 400000 KHz*/
-    channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE; /*i.e. 100000 KHz*/
+    //channelConf.ClockRate = I2C_CLOCK_STANDARD_MODE; /*i.e. 100000 KHz*/
+    channelConf.ClockRate = ATCA_IFACECFG_I2C_BAUD(cfg);
     //channelConf.ClockRate = 20000; /*for test only*/
     channelConf.LatencyTimer = 255;
     //channelConf.Options = I2C_DISABLE_3PHASE_CLOCKING;
@@ -101,6 +101,9 @@ ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
     //channelConf.Options = I2C_DISABLE_3PHASE_CLOCKING | I2C_ENABLE_DRIVE_ONLY_ZERO;
 
     Init_libMPSSE();
+#ifdef INFRA_DEBUG_ENABLE
+    currentDebugLevel = MSG_WARN;
+#endif
     status = I2C_GetChannelInfo(hal->channel, &devList);
     status = I2C_OpenChannel(hal->channel, &hal->ftHandle);
     status = I2C_InitChannel(hal->ftHandle, &channelConf);
@@ -122,6 +125,18 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
     return ATCA_SUCCESS;
 }
 
+#ifndef DUMP_RXTX
+void dumpbuffer(const char* txt, const unsigned char* buf, unsigned nlen)
+{
+    printf("%s %4d: ", txt, GetTickCount() % 10000);
+    for (unsigned i = 0; i < nlen; i++)
+        printf("%02x ", buf[i]);
+    printf("\n");
+}
+#else
+#define dumpbuffer(txt,buf,nlen)
+#endif
+
 /** \brief HAL implementation of I2C send
  * \param[in] iface         instance
  * \param[in] word_address  device transaction type
@@ -141,17 +156,13 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
         return ATCA_NOT_INITIALIZED;
     if (txlength >= (sizeof(temp_buf) - 1))
         return ATCA_BAD_PARAM;
-    if (device_address == 0)
-        return ATCA_SUCCESS;
     temp_buf[0] = word_address;
     if (txlength > 1 && txdata)
         memcpy(temp_buf + 1, txdata, txlength);
     txlength++;
 
-    if (device_address != 0)
-        options = I2C_TRANSFER_OPTIONS_START_BIT | I2C_TRANSFER_OPTIONS_STOP_BIT | I2C_TRANSFER_OPTIONS_BREAK_ON_NACK;
-    else
-        options = I2C_TRANSFER_OPTIONS_START_BIT | I2C_TRANSFER_OPTIONS_STOP_BIT;
+    options = I2C_TRANSFER_OPTIONS_START_BIT | I2C_TRANSFER_OPTIONS_STOP_BIT | I2C_TRANSFER_OPTIONS_FAST_TRANSFER;
+    dumpbuffer("i2c_sen", temp_buf, txlength);
     status = I2C_DeviceWrite(hal->ftHandle, device_address >> 1, txlength, temp_buf, &xfer, options);
 
     if (status != FT_OK)
@@ -180,12 +191,11 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t addr, uint8_t* rxdata, uint
 
     /* Repeated Start condition generated. */
     status = I2C_DeviceRead(phal->ftHandle, device_address >> 1, *rxlength, rxdata, &xfer,
-        I2C_TRANSFER_OPTIONS_START_BIT |
-        I2C_TRANSFER_OPTIONS_STOP_BIT
-        //| I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES
-        //| I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE
+        I2C_TRANSFER_OPTIONS_START_BIT | I2C_TRANSFER_OPTIONS_STOP_BIT
+        | I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES
     );
     *rxlength = (uint16_t)xfer;
+    dumpbuffer("i2c_rec", rxdata, *rxlength);
     if (status == FT_OK)
         return ATCA_SUCCESS;
     return ATCA_COMM_FAIL;
@@ -206,7 +216,7 @@ ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t
 
     if ((NULL != iface) && (NULL != iface->mIfaceCFG))
     {
-    /* This HAL does not support any of the control functions */
+        /* This HAL does not support any of the control functions */
         return ATCA_UNIMPLEMENTED;
     }
     return ATCA_BAD_PARAM;
