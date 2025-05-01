@@ -50,6 +50,11 @@ FT_STATUS JFT_Write(
     return varFunctionPtrLst.p_FT_Write(ftHandle, lpBuffer, dwBytesToWrite, lpBytesWritten);
 }
 
+FT_STATUS JFT_SetBaudRate(FT_HANDLE ftHandle, DWORD dwBaudRate)
+{
+    return varFunctionPtrLst.p_FT_SetBaudRate(ftHandle, dwBaudRate);
+}
+
 struct i2c_algo_bit_data
 {
     unsigned udelay;
@@ -104,12 +109,14 @@ void yield()
 	do {} while (0)
 #endif /* DEBUG */
 
-#define SCLMSK 0x01
-#define SDAMSK 0x02
+#define SCLMSK  0x01 // TX
+#define SDAMSK  0x02 // RX
+#define SENDMSK 0x04 // RTS
+
 
 
 FT_HANDLE m_ftHandle;
-DWORD m_direction = 0; 
+DWORD m_direction = 0;
 DWORD m_gpiooutvalue = 0;
 DWORD m_gpioinvalue = 0;
 DWORD m_olddirection;
@@ -160,11 +167,65 @@ int i2c_bitbang_init()
     return 0;
 }
 
+
 void i2c_bitbang_exit()
 {
     if (m_ftHandle != 0)
         JFT_Close(m_ftHandle);
     m_ftHandle = 0;
+}
+
+#ifndef DUMP_RXTX
+static void dumpbuffer(const char* txt, const unsigned char* buf, unsigned nlen)
+{
+    printf("%s %4d: ", txt, GetTickCount() % 10000);
+    for (unsigned i = 0; i < nlen; i++)
+        printf("%02x ", buf[i]);
+    printf("\n");
+}
+#else
+#define dumpbuffer(txt,buf,nlen)
+#endif
+
+void testbitbang()
+{
+    FT_STATUS ftStatus;
+    DWORD nbyteswr;
+    DWORD nbytesrd;
+    unsigned char ucrbuff[200];
+    unsigned nwbytes;
+    unsigned char ucwbuff[200];
+
+    i2c_bitbang_init();
+
+    ftStatus = 0;
+    ftStatus |= JFT_SetBaudRate(m_ftHandle, 2400);
+    ftStatus |= JFT_SetBitMode(m_ftHandle, SCLMSK | SDAMSK | SENDMSK | 0xff, FT_BITMODE_SYNC_BITBANG);
+    for (int cnt = 0; cnt < 10; cnt++)
+    {
+        nwbytes = 10;
+        for (unsigned n = 0; n < nwbytes; )
+        {
+            //ucwbuff[n++] = SENDMSK | SDAMSK;
+            //ucwbuff[n++] = SENDMSK | SDAMSK | SCLMSK;
+            ucwbuff[n++] = 0;
+            ucwbuff[n++] = 0xff;
+        }
+        nwbytes = 1;
+        ucwbuff[0] = 0;
+        ftStatus |= JFT_Write(m_ftHandle, &ucwbuff, nwbytes, &nbyteswr);
+        ucwbuff[0] = SENDMSK | SDAMSK;
+        ftStatus |= JFT_Write(m_ftHandle, &ucwbuff, nwbytes, &nbyteswr);
+        ucwbuff[0] = SENDMSK | SCLMSK ;
+        ftStatus |= JFT_Write(m_ftHandle, &ucwbuff, nwbytes, &nbyteswr);
+        ucwbuff[0] = SENDMSK | SCLMSK | SDAMSK;
+        ftStatus |= JFT_Write(m_ftHandle, &ucwbuff, nwbytes, &nbyteswr);
+        ftStatus |= JFT_Read(m_ftHandle, &ucrbuff, nbyteswr, &nbytesrd);
+        dumpbuffer("JFT_Read ", ucrbuff, nbytesrd);
+        if (ftStatus != FT_OK)
+            printf("Fehler FT_XX\n");
+    }
+    i2c_bitbang_exit();
 }
 
 void setsda(struct i2c_algo_bit_data* adap, int val)
@@ -538,7 +599,7 @@ static int sendbytes(struct i2c_algo_bit_data* adap, struct i2c_msg* msg)
     return wrcount;
 }
 
-static int acknak(struct i2c_algo_bit_data* adap , int is_ack)
+static int acknak(struct i2c_algo_bit_data* adap, int is_ack)
 {
 
     /* assert: sda is high */
@@ -553,7 +614,7 @@ static int acknak(struct i2c_algo_bit_data* adap , int is_ack)
     return 0;
 }
 
-static int readbytes(struct i2c_algo_bit_data* adap , struct i2c_msg* msg)
+static int readbytes(struct i2c_algo_bit_data* adap, struct i2c_msg* msg)
 {
     int inval;
     int rdcount = 0;	/* counts bytes read */
@@ -614,7 +675,7 @@ static int readbytes(struct i2c_algo_bit_data* adap , struct i2c_msg* msg)
  * -x an error occurred (like: -ENXIO if the device did not answer, or
  *	-ETIMEDOUT, for example if the lines are stuck...)
  */
-static int bit_doAddress(struct i2c_algo_bit_data* adap , struct i2c_msg* msg)
+static int bit_doAddress(struct i2c_algo_bit_data* adap, struct i2c_msg* msg)
 {
     unsigned short flags = msg->flags;
     unsigned short nak_ok = msg->flags & I2C_M_IGNORE_NAK;
@@ -669,7 +730,7 @@ static int bit_doAddress(struct i2c_algo_bit_data* adap , struct i2c_msg* msg)
     return 0;
 }
 
-static int bit_xfer(struct i2c_algo_bit_data* adap ,
+static int bit_xfer(struct i2c_algo_bit_data* adap,
     struct i2c_msg msgs[], int num)
 {
     struct i2c_msg* pmsg;

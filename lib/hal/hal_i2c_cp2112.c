@@ -38,17 +38,28 @@
 #include "atca_hal.h"
 #include "SLABCP2112.h"
 
-//
+ //
 //#define DEBUG_BYTES
 #ifdef DEBUG_BYTES
-static DWORD g_tStart;
-DWORD GetTick()
+static void dumpbuffer(const char* txt, unsigned uaddr, const unsigned char* buf, unsigned nlen)
 {
-    if (g_tStart == 0)
-        g_tStart = GetTickCount();
-    return GetTickCount() - g_tStart;
+    printf("%s %02x %4d: ", txt, uaddr, GetTickCount() % 10000);
+    for (unsigned i = 0; i < nlen; i++)
+        printf("%02x ", buf[i]);
+    printf("\n");
 }
+#else
+#define dumpbuffer(txt,adr,buf,nlen)
 #endif
+//#ifdef DEBUG_BYTES
+//static DWORD g_tStart;
+//DWORD GetTick()
+//{
+//    if (g_tStart == 0)
+//        g_tStart = GetTickCount();
+//    return GetTickCount() - g_tStart;
+//}
+//#endif
  /** \defgroup hal_ Hardware abstraction layer (hal_)
   *
   * \brief
@@ -153,8 +164,8 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
     if (txlength >= (sizeof(temp_buf) - 1))
         return ATCA_BAD_PARAM;
 
-    if (device_address == 0)
-        return ATCA_SUCCESS;
+    //if (device_address == 0)
+    //    return ATCA_SUCCESS;
     temp_buf[0] = word_address;
     if (txlength > 1 && txdata)
         memcpy(temp_buf + 1, txdata, txlength);
@@ -166,12 +177,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
     status = HidSmbus_WriteRequest(phal->m_hidSmbus, device_address, temp_buf, txlength);
     if (status != 0)
         return ATCA_COMM_FAIL;
-#ifdef DEBUG_BYTES
-    printf("i2c_sen %4ld addr %02x, nlen %d :", GetTick(), device_address >> 1, txlength);
-    for (int n = 0; n < txlength; n++)
-        printf("%02x ", temp_buf[n]);
-    printf("\n");
-#endif
+    dumpbuffer("i2c_sen", device_address >> 1, temp_buf, txlength);
     return ATCA_SUCCESS;
 }
 
@@ -216,12 +222,7 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t device_address, uint8_t* rx
             {
                 *rxlength = rxcnt;
                 phal->m_readstatus0 = HID_SMBUS_S0_IDLE;
-#ifdef DEBUG_BYTES
-                printf("i2c_rec %4ld addr %02x, nlen %d/%d :", GetTick(), device_address >> 1, *rxlength, rxcnt);
-                for (int n = 0; n < *rxlength; n++)
-                    printf("%02x ", rxdata[n]);
-                printf("\n");
-#endif
+                dumpbuffer("i2c_rec", device_address >> 1, rxdata, rxcnt);
                 return ATCA_SUCCESS;
             }
         }

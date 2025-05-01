@@ -42,7 +42,6 @@
 
 #include "atca_hal.h"
 
-
  /** \defgroup hal_ Hardware abstraction layer (hal_)
   *
   * \brief
@@ -126,7 +125,7 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
 }
 
 #ifndef DUMP_RXTX
-void dumpbuffer(const char* txt, const unsigned char* buf, unsigned nlen)
+static void dumpbuffer(const char* txt, const unsigned char* buf, unsigned nlen)
 {
     printf("%s %4d: ", txt, GetTickCount() % 10000);
     for (unsigned i = 0; i < nlen; i++)
