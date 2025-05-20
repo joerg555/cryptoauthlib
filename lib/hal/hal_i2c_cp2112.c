@@ -39,7 +39,7 @@
 #include "SLABCP2112.h"
 
  //
-//#define DEBUG_BYTES
+#define DEBUG_BYTES
 #ifdef DEBUG_BYTES
 static void dumpbuffer(const char* txt, unsigned uaddr, const unsigned char* buf, unsigned nlen)
 {
@@ -156,7 +156,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
     atca_i2c_cp2112_host_t* phal = (atca_i2c_cp2112_host_t*)atgetifacehaldat(iface);
     HID_SMBUS_STATUS status;
     BOOL opened;
-    uint8_t temp_buf[64];
+    uint8_t temp_buf[256];
     uint8_t device_address = ATCA_IFACECFG_I2C_ADDRESS(iface->mIfaceCFG);
 
     if (phal == NULL || phal->m_hidSmbus == NULL)
@@ -174,10 +174,29 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
     if (!(HidSmbus_IsOpened(phal->m_hidSmbus, &opened) == HID_SMBUS_SUCCESS && opened))
         return ATCA_COMM_FAIL;
     status = HidSmbus_CancelTransfer(phal->m_hidSmbus);
-    status = HidSmbus_WriteRequest(phal->m_hidSmbus, device_address, temp_buf, txlength);
-    if (status != 0)
-        return ATCA_COMM_FAIL;
-    dumpbuffer("i2c_sen", device_address >> 1, temp_buf, txlength);
+    int offset = 0;
+    int nmax = HID_SMBUS_MAX_WRITE_REQUEST_SIZE;
+    while (offset < txlength)
+    {
+        int send_len = txlength - offset;
+        if (send_len > nmax)
+            send_len = nmax;
+        status = HidSmbus_WriteRequest(phal->m_hidSmbus, device_address, temp_buf + offset, send_len);
+        if (status != 0)
+            return ATCA_COMM_FAIL;
+        dumpbuffer("i2c_sen", device_address >> 1, temp_buf + offset, send_len);
+        offset += send_len;
+        if (offset < txlength)
+        {
+            HID_SMBUS_S0 status_s0 = 0;
+            HID_SMBUS_S1 status_s1 = 0;
+            WORD numRetries = 0, bytesRead = 0;
+            HID_SMBUS_STATUS hist1, hist2;
+            hist1 = HidSmbus_TransferStatusRequest(phal->m_hidSmbus);
+            hist2 = HidSmbus_GetTransferStatusResponse(phal->m_hidSmbus, &status_s0, &status_s1, &numRetries, &bytesRead);
+            Sleep(1);
+        }
+    }
     return ATCA_SUCCESS;
 }
 
