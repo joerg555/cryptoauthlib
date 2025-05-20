@@ -717,6 +717,8 @@ void UnityAssertEqualNumber(const UNITY_INT expected,
         UnityPrint(UnityStrExpected);
         UnityPrintNumberByStyle(expected, style);
         UnityPrint(UnityStrWas);
+        if (actual == -30 /*ATCA_BAD_PARAM*/)
+            UnityPrint("'pad param :'");
         UnityPrintNumberByStyle(actual, style);
         UnityAddMsgIfSpecified(msg);
         UNITY_FAIL_AND_BAIL;

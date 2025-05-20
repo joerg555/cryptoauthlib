@@ -98,32 +98,42 @@ typedef struct ATCA_PACKED atecc508a_config_s
 
 typedef struct ATCA_PACKED atecc608_config_s
 {
+    //
     uint32_t SN03;
     uint32_t RevNum;
     uint32_t SN47;
+    // 12
     uint8_t  SN8;
     uint8_t  AES_Enable;
     uint8_t  I2C_Enable;
     uint8_t  Reserved1;
+    // 16
     uint8_t  I2C_Address;
     uint8_t  Reserved2;
     uint8_t  CountMatch;
     uint8_t  ChipMode;
+    // 20
     uint16_t SlotConfig[16];
+    // 52
     uint8_t  Counter0[8];
     uint8_t  Counter1[8];
+    // 68
     uint8_t  UseLock;
     uint8_t  VolatileKeyPermission;
     uint16_t SecureBoot;
+    // 72
     uint8_t  KdflvLoc;
     uint16_t KdflvStr;
     uint8_t  Reserved3[9];
+    //
     uint8_t  UserExtra;
     uint8_t  UserExtraAdd;
     uint8_t  LockValue;
     uint8_t  LockConfig;
+    //
     uint16_t SlotLocked;
     uint16_t ChipOptions;
+    //
     uint32_t X509format;
     uint16_t KeyConfig[16];
 } atecc608_config_t;
