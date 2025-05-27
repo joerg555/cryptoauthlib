@@ -38,12 +38,35 @@
 #include "atca_hal.h"
 #include "SLABCP2112.h"
 
- //
+// Debug interface
+
 #define DEBUG_BYTES
 #ifdef DEBUG_BYTES
+
+#ifndef ATCA_HAL_SET_DEBUG
+#define ATCA_HAL_SET_DEBUG  10
+#endif
+
+int hal_i2c_debug = 0;
+#ifndef WIN32
+#include <time.h>
+unsigned long GetTickCount(void)
+{
+    unsigned long ticks;
+    struct timespec now;
+    // "Monotonic system-wide clock" Zeitstempel von System
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    ticks = now.tv_sec * 1000l;
+    ticks += now.tv_nsec / 1000000l;
+    return ticks;
+}
+#endif
+
 static void dumpbuffer(const char* txt, unsigned uaddr, const unsigned char* buf, unsigned nlen)
 {
-    printf("%s %02x %4d: ", txt, uaddr, GetTickCount() % 10000);
+    if (hal_i2c_debug == 0)
+        return;
+    printf("%s adr %02x %4d: ", txt, uaddr, GetTickCount() % 10000);
     for (unsigned i = 0; i < nlen; i++)
         printf("%02x ", buf[i]);
     printf("\n");
@@ -67,13 +90,13 @@ static void dumpbuffer(const char* txt, unsigned uaddr, const unsigned char* buf
   *
     @{ */
 
-typedef struct atca_i2c_cp2112_host_s
+typedef struct atca_i2c_host_s
 {
-    int  ref_ct;
     HID_SMBUS_DEVICE m_hidSmbus;
     unsigned long m_devnum;
     HID_SMBUS_S0	m_readstatus0;
-} atca_i2c_cp2112_host_t;
+    int  ref_ct;
+} atca_i2c_host_t;
 
 
 /** \brief HAL implementation of I2C init
@@ -87,23 +110,23 @@ typedef struct atca_i2c_cp2112_host_s
  */
 ATCA_STATUS hal_i2c_init(ATCAIface iface, ATCAIfaceCfg* cfg)
 {
-    atca_i2c_cp2112_host_t* phal;
+    atca_i2c_host_t* phal;
 
     if (iface == NULL || cfg == NULL)
         return ATCA_BAD_PARAM;
 
     if (iface->hal_data != NULL)
     {
-        phal = (atca_i2c_cp2112_host_t*)iface->hal_data;
+        phal = (atca_i2c_host_t*)iface->hal_data;
 
         // Assume the bus had already been initialized
         phal->ref_ct++;
 
         return ATCA_SUCCESS;
     }
-    if ((iface->hal_data = malloc(sizeof(atca_i2c_cp2112_host_t))) == NULL)
+    if ((iface->hal_data = malloc(sizeof(atca_i2c_host_t))) == NULL)
         return ATCA_ALLOC_FAILURE;
-    phal = (atca_i2c_cp2112_host_t*)iface->hal_data;
+    phal = (atca_i2c_host_t*)iface->hal_data;
 
     phal->ref_ct = 1;                                 // buses are shared, this is the first instance
     phal->m_devnum = (int)ATCA_IFACECFG_VALUE(cfg, atcai2c.bus); // 0-based logical bus number
@@ -153,7 +176,7 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
  */
 ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata, int txlength)
 {
-    atca_i2c_cp2112_host_t* phal = (atca_i2c_cp2112_host_t*)atgetifacehaldat(iface);
+    atca_i2c_host_t* phal = (atca_i2c_host_t*)atgetifacehaldat(iface);
     HID_SMBUS_STATUS status;
     BOOL opened;
     uint8_t temp_buf[256];
@@ -210,7 +233,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
  */
 ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t device_address, uint8_t* rxdata, uint16_t* rxlength)
 {
-    atca_i2c_cp2112_host_t* phal = (atca_i2c_cp2112_host_t*)atgetifacehaldat(iface);
+    atca_i2c_host_t* phal = (atca_i2c_host_t*)atgetifacehaldat(iface);
 
     HID_SMBUS_STATUS status;
     BOOL opened;
@@ -263,16 +286,20 @@ ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t
     (void)option;
     (void)param;
     (void)paramlen;
-
-    if ((NULL != iface) && (NULL != iface->mIfaceCFG))
+#ifdef DEBUG_BYTES
+    if (option == ATCA_HAL_SET_DEBUG)
     {
+        hal_i2c_debug = 1; // enable debug output
+        return ATCA_SUCCESS;
+    }
+#endif
+    if (iface == NULL || iface->mIfaceCFG == NULL)
+        return ATCA_BAD_PARAM;
         if (option == ATCA_HAL_CHANGE_BAUD)
             return ATCA_SUCCESS;    // may be error if we say unimplemented
         /* This HAL does not support any of the control functions */
         return ATCA_UNIMPLEMENTED;
     }
-    return ATCA_BAD_PARAM;
-}
 
 /** \brief manages reference count on given bus and releases resource if no more refences exist
  * \param[in] hal_data - opaque pointer to hal data structure - known only to the HAL implementation
@@ -280,7 +307,7 @@ ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t
  */
 ATCA_STATUS hal_i2c_release(void* hal_data)
 {
-    atca_i2c_cp2112_host_t* phal = (atca_i2c_cp2112_host_t*)hal_data;
+    atca_i2c_host_t* phal = (atca_i2c_host_t*)hal_data;
 
     if (phal != NULL)
     {

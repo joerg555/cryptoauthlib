@@ -41,6 +41,42 @@
 #include <limits.h>
 
 #include "atca_hal.h"
+// Debug interface
+
+#define DEBUG_BYTES
+#ifdef DEBUG_BYTES
+
+#ifndef ATCA_HAL_SET_DEBUG
+#define ATCA_HAL_SET_DEBUG  10
+#endif
+
+int hal_i2c_debug = 0;
+#ifndef WIN32
+#include <time.h>
+unsigned long GetTickCount(void)
+{
+    unsigned long ticks;
+    struct timespec now;
+    // "Monotonic system-wide clock" Zeitstempel von System
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    ticks = now.tv_sec * 1000l;
+    ticks += now.tv_nsec / 1000000l;
+    return ticks;
+}
+#endif
+
+static void dumpbuffer(const char* txt, unsigned uaddr, const unsigned char* buf, unsigned nlen)
+{
+    if (hal_i2c_debug == 0)
+        return;
+    printf("%s adr %02x %4d: ", txt, uaddr, GetTickCount() % 10000);
+    for (unsigned i = 0; i < nlen; i++)
+        printf("%02x ", buf[i]);
+    printf("\n");
+}
+#else
+#define dumpbuffer(txt,adr,buf,nlen)
+#endif
 
 /** \defgroup hal_ Hardware abstraction layer (hal_)
  *
@@ -130,6 +166,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t *txdata,
     int f_i2c;  // I2C file descriptor
     uint8_t device_address = 0xFFu;
     uint8_t* temp_buf = NULL;
+    int n;
 
     if (NULL == hal_data)
     {
@@ -177,8 +214,11 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t *txdata,
     }
 
     // Send data
-    if (write(f_i2c, temp_buf, (size_t)txlength) != txlength)
+    n = write(f_i2c, temp_buf, (size_t)txlength);
+    dumpbuffer("i2c_sen", device_address >> 1, temp_buf, txlength);
+    if (n != txlength)
     {
+        fprintf(stderr, "Error Write %02x %d bytes written instead of %d\n", device_address >> 1, n, txlength);
         hal_free(temp_buf);
         (void)close(f_i2c);
         return ATCA_COMM_FAIL;
@@ -197,7 +237,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t *txdata,
  *                              As output, the number of bytes received.
  * \return ATCA_SUCCESS on success, otherwise an error code.
  */
-ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t word_address, uint8_t *rxdata, uint16_t *rxlength)
+ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t device_address, uint8_t *rxdata, uint16_t *rxlength)
 {
     atca_i2c_host_t * hal_data = (atca_i2c_host_t*)atgetifacehaldat(iface);
     int f_i2c;  // I2C file descriptor
@@ -215,7 +255,7 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t word_address, uint8_t *rxda
     }
 
     // Set Device Address
-    if (ioctl(f_i2c, I2C_SLAVE, word_address >> 1) < 0)
+    if (ioctl(f_i2c, I2C_SLAVE, device_address >> 1) < 0)
     {
         (void)close(f_i2c);
         return ATCA_COMM_FAIL;
@@ -225,12 +265,14 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t word_address, uint8_t *rxda
     {
         if (read(f_i2c, rxdata, (size_t)*rxlength) != (int)*rxlength)
         {
+            fprintf(stderr, "Error Read %02x %d bytes read instead of %d\n", device_address >> 1, *rxlength, *rxlength);
             (void)close(f_i2c);
             return ATCA_COMM_FAIL;
         }
     }
 
     (void)close(f_i2c);
+    dumpbuffer("i2c_sen", device_address >> 1, rxdata, *rxlength);
     return ATCA_SUCCESS;
 }
 
@@ -246,7 +288,13 @@ ATCA_STATUS hal_i2c_control(ATCAIface iface, uint8_t option, void* param, size_t
     (void)option;
     (void)param;
     (void)paramlen;
-
+#ifdef DEBUG_BYTES
+    if (option == ATCA_HAL_SET_DEBUG)
+    {
+        hal_i2c_debug = 1; // enable debug output
+        return ATCA_SUCCESS;
+    }
+#endif
     if ((NULL != iface) && (NULL != iface->mIfaceCFG))
     {
         /* This HAL does not support any of the control functions */
