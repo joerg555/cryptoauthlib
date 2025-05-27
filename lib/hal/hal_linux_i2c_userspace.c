@@ -69,7 +69,7 @@ static void dumpbuffer(const char* txt, unsigned uaddr, const unsigned char* buf
 {
     if (hal_i2c_debug == 0)
         return;
-    printf("%s adr %02x %4d: ", txt, uaddr, GetTickCount() % 10000);
+    printf("%s adr %02x ms %4d: ", txt, uaddr, GetTickCount() % 10000);
     for (unsigned i = 0; i < nlen; i++)
         printf("%02x ", buf[i]);
     printf("\n");
@@ -218,7 +218,10 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t *txdata,
     dumpbuffer("i2c_sen", device_address >> 1, temp_buf, txlength);
     if (n != txlength)
     {
-        fprintf(stderr, "Error Write %02x %d bytes written instead of %d\n", device_address >> 1, n, txlength);
+        if (device_address != 0 && txlength > 1)
+        {
+            fprintf(stderr, "Error Write %02x %d bytes written instead of %d\n", device_address >> 1, n, txlength);
+        }
         hal_free(temp_buf);
         (void)close(f_i2c);
         return ATCA_COMM_FAIL;
@@ -265,14 +268,15 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t device_address, uint8_t *rx
     {
         if (read(f_i2c, rxdata, (size_t)*rxlength) != (int)*rxlength)
         {
-            fprintf(stderr, "Error Read %02x %d bytes read instead of %d\n", device_address >> 1, *rxlength, *rxlength);
+            if (device_address != 0)
+                fprintf(stderr, "Error Read %02x %d bytes read instead of %d\n", device_address >> 1, *rxlength, *rxlength);
             (void)close(f_i2c);
             return ATCA_COMM_FAIL;
         }
     }
 
     (void)close(f_i2c);
-    dumpbuffer("i2c_sen", device_address >> 1, rxdata, *rxlength);
+    dumpbuffer("i2c_rec", device_address >> 1, rxdata, *rxlength);
     return ATCA_SUCCESS;
 }
 
