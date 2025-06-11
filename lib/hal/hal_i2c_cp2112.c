@@ -176,7 +176,7 @@ ATCA_STATUS hal_i2c_post_init(ATCAIface iface)
  */
 ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata, int txlength)
 {
-    atca_i2c_host_t* phal = (atca_i2c_host_t*)atgetifacehaldat(iface);
+    atca_i2c_host_t* phal = (atca_i2c_host_t*)iface->hal_data;
     HID_SMBUS_STATUS status;
     BOOL opened;
     uint8_t temp_buf[256];
@@ -233,7 +233,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t word_address, uint8_t* txdata,
  */
 ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t device_address, uint8_t* rxdata, uint16_t* rxlength)
 {
-    atca_i2c_host_t* phal = (atca_i2c_host_t*)atgetifacehaldat(iface);
+    atca_i2c_host_t* phal = (atca_i2c_host_t*)iface->hal_data;
 
     HID_SMBUS_STATUS status;
     BOOL opened;
